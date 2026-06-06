@@ -25,7 +25,7 @@ cloudinary.config({
 });
 
 // ─── GET ALL MEDIA (Images + Videos) ─────────────────────────────
-app.get("/media", async (req, res) => {
+app.get("/api/media", async (req, res) => {
   try {
     const [imageResult, videoResult] = await Promise.all([
       cloudinary.api.resources({
@@ -111,7 +111,7 @@ app.get("/media", async (req, res) => {
 });
 
 // ─── GET MEDIA BY TAG ────────────────────────────────────────────
-app.get("/media/tag/:tag", async (req, res) => {
+app.get("/api/media/tag/:tag", async (req, res) => {
   try {
     const { tag } = req.params;
 
@@ -164,7 +164,7 @@ app.get("/media/tag/:tag", async (req, res) => {
 });
 
 // ─── SEARCH MEDIA ──────────────────────────────────────────────
-app.get("/media/search", async (req, res) => {
+app.get("/api/media/search", async (req, res) => {
   try {
     const { q } = req.query;
     if (!q)
@@ -212,7 +212,7 @@ app.get("/media/search", async (req, res) => {
 
 // ─── DELETE MEDIA FROM CLOUDINARY ──────────────────────────────────
 // Express wildcard pattern ":publicId(*)" handles nested folder paths with slashes gracefully
-app.delete("/media/:publicId(*)", async (req, res) => {
+app.delete("/api/media/:publicId(*)", async (req, res) => {
   try {
     const publicId = decodeURIComponent(req.params.publicId);
     console.log(`🗑️ Request received to delete: ${publicId}`);
@@ -264,7 +264,7 @@ app.delete("/media/:publicId(*)", async (req, res) => {
 });
 
 // ─── HEALTH CHECK ──────────────────────────────────────────────
-app.get("/health", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
     cloudName: process.env.CLOUDINARY_CLOUD_NAME || "oh7wc75d",
