@@ -149,17 +149,30 @@ function usePinchZoom() {
     return Math.sqrt(dx * dx + dy * dy);
   };
 
-  // Touch handlers (Mobile)
+  // Fungsi untuk membatasi pergeseran agar gambar tidak keluar dari area layar (Bounding Box)
+  const clampPosition = useCallback((x: number, y: number, currentScale: number) => {
+    if (!containerRef.current || currentScale <= 1) return { x: 0, y: 0 };
+
+    const rect = containerRef.current.getBoundingClientRect();
+    // Menghitung batas maksimum pergeseran kiri-kanan dan atas-bawah berdasarkan skala zoom
+    const maxBoundX = (rect.width * (currentScale - 1)) / 2;
+    const maxBoundY = (rect.height * (currentScale - 1)) / 2;
+
+    return {
+      x: Math.min(Math.max(x, -maxBoundX), maxBoundX),
+      y: Math.min(Math.max(y, -maxBoundY), maxBoundY),
+    };
+  }, []);
+
+  // Touch Handlers (Untuk HP / Touchscreen Laptop)
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLDivElement>) => {
       if (e.touches.length === 2) {
         e.preventDefault();
         stateRef.current.isPinching = true;
-        stateRef.current.initialDistance = getDistance(
-          e.touches as unknown as TouchList,
-        );
+        stateRef.current.initialDistance = getDistance(e.touches as unknown as TouchList);
         stateRef.current.initialScale = scale;
-      } else if (e.touches.length === 1 && scale > 1.1) {
+      } else if (e.touches.length === 1 && scale > 1.05) {
         stateRef.current.isDragging = true;
         stateRef.current.startX = e.touches[0].clientX;
         stateRef.current.startY = e.touches[0].clientY;
@@ -176,44 +189,41 @@ function usePinchZoom() {
         e.preventDefault();
         const distance = getDistance(e.touches as unknown as TouchList);
         const newScale = Math.min(
-          Math.max(
-            stateRef.current.initialScale *
-              (distance / stateRef.current.initialDistance),
-            1,
-          ),
-          4,
+          Math.max(stateRef.current.initialScale * (distance / stateRef.current.initialDistance), 1),
+          4
         );
         setScale(newScale);
-        if (newScale <= 1.1) setPosition({ x: 0, y: 0 });
-      } else if (
-        e.touches.length === 1 &&
-        stateRef.current.isDragging &&
-        scale > 1.1
-      ) {
+        if (newScale <= 1.05) {
+          setPosition({ x: 0, y: 0 });
+        } else {
+          // Sesuaikan posisi saat mencubit layar
+          setPosition((prev) => clampPosition(prev.x, prev.y, newScale));
+        }
+      } else if (e.touches.length === 1 && stateRef.current.isDragging && scale > 1.05) {
         const deltaX = e.touches[0].clientX - stateRef.current.startX;
         const deltaY = e.touches[0].clientY - stateRef.current.startY;
-        setPosition({
-          x: stateRef.current.startPanX + deltaX,
-          y: stateRef.current.startPanY + deltaY,
-        });
+        const targetX = stateRef.current.startPanX + deltaX;
+        const targetY = stateRef.current.startPanY + deltaY;
+        setPosition(clampPosition(targetX, targetY, scale));
       }
     },
-    [scale],
+    [scale, clampPosition],
   );
 
   const handleTouchEnd = useCallback(() => {
     stateRef.current.isPinching = false;
     stateRef.current.isDragging = false;
-    if (scale < 1.1) {
+    if (scale < 1.05) {
       setScale(1);
       setPosition({ x: 0, y: 0 });
     }
   }, [scale]);
 
-  // Mouse handlers (PC Drag / Panning saat ter-zoom)
+  // Mouse Handlers (Untuk Geser Kiri, Kanan, Atas, Bawah via Mouse PC)
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (scale > 1.1 && e.button === 0) {
+      // Hanya aktif jika gambar sedang di-zoom dan tombol yang diklik adalah klik kiri (button 0)
+      if (scale > 1.05 && e.button === 0) {
         e.preventDefault();
         stateRef.current.isDragging = true;
         stateRef.current.startX = e.clientX;
@@ -227,43 +237,48 @@ function usePinchZoom() {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (stateRef.current.isDragging && scale > 1.1) {
+      if (stateRef.current.isDragging && scale > 1.05) {
         e.preventDefault();
+        // Menghitung seberapa jauh mouse digeser dari titik awal klik
         const deltaX = e.clientX - stateRef.current.startX;
         const deltaY = e.clientY - stateRef.current.startY;
-        setPosition({
-          x: stateRef.current.startPanX + deltaX,
-          y: stateRef.current.startPanY + deltaY,
-        });
+        
+        const targetX = stateRef.current.startPanX + deltaX;
+        const targetY = stateRef.current.startPanY + deltaY;
+
+        // Terapkan posisi baru yang sudah dibatasi border layar
+        setPosition(clampPosition(targetX, targetY, scale));
       }
     },
-    [scale],
+    [scale, clampPosition],
   );
 
   const handleMouseUp = useCallback(() => {
     stateRef.current.isDragging = false;
   }, []);
 
-  // Mouse Wheel Handler (PC / Trackpad Scroll)
+  // Mouse Wheel Handler (Scroll Zoom)
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
-    // Menghitung arah kemudi scroll wheel
-    const zoomIntensity = 0.1;
+    const zoomIntensity = 0.15;
     const delta = e.deltaY < 0 ? 1 : -1;
     
     setScale((prevScale) => {
       const newScale = Math.min(Math.max(prevScale + delta * zoomIntensity, 1), 4);
-      if (newScale <= 1.1) {
+      if (newScale <= 1.05) {
         setPosition({ x: 0, y: 0 });
+      } else {
+        // Jaga agar posisi tetap presisi saat di-zoom out di tengah pergeseran
+        setPosition((prev) => clampPosition(prev.x, prev.y, newScale));
       }
       return newScale;
     });
-  }, []);
+  }, [clampPosition]);
 
   const handleDoubleTap = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (scale > 1.1) {
+      if (scale > 1.05) {
         setScale(1);
         setPosition({ x: 0, y: 0 });
       } else {
