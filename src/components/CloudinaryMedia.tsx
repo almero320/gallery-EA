@@ -474,7 +474,7 @@ export function CloudinaryMedia() {
     }
   };
 
-// ─── Download Media Handler (Perbaikan Video) ──────────────────────
+// ─── Download Media Handler (Fix Error 423) ──────────────────────
   const handleDownload = async (e: React.MouseEvent, item: MediaItem) => {
     e.stopPropagation(); // Biar lightbox gak ketutup pas diklik
 
@@ -485,22 +485,25 @@ export function CloudinaryMedia() {
     }
 
     try {
-      // 1. KONDISI KHUSUS VIDEO CLOUDINARY (Solusi CORS)
-      // Kita sisipkan fl_attachment ke URL Cloudinary agar server memaksa browser mendownload langsung
+      // 1. KONDISI KHUSUS VIDEO CLOUDINARY (Solusi CORS & Fix Overlap URL)
       if (item.source === "cloudinary" && isVideo(item)) {
         if (url.includes("/upload/")) {
-          // Menyisipkan f_auto,q_auto (jika belum ada) ditambah fl_attachment
-          url = url.replace("/upload/", "/upload/f_auto,q_auto,fl_attachment/");
+          // JIKA sudah ada f_auto,q_auto dari fungsi optimizeUrl, kita selipkan fl_attachment di sebelahnya
+          if (url.includes("f_auto,q_auto")) {
+            url = url.replace("f_auto,q_auto", "f_auto,q_auto,fl_attachment");
+          } else {
+            // JIKA belum ada sama sekali, baru kita masukkan semuanya
+            url = url.replace("/upload/", "/upload/f_auto,q_auto,fl_attachment/");
+          }
         } else {
-          // Jika strukturnya berbeda, kita coba langsung buka tab baru yang memaksa download
+          // Fallback jika struktur url cloudinary berbeda
           window.open(url, "_blank");
           return;
         }
 
-        // Bikin virtual anchor untuk mendownload URL Cloudinary yang sudah dimodifikasi
+        // Bikin virtual anchor untuk download langsung
         const link = document.createElement("a");
         link.href = url;
-        // Beri nama file (beberapa browser modern akan mematuhi ini jika header pas)
         link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, "_") || "video"}.mp4`;
         document.body.appendChild(link);
         link.click();
@@ -520,7 +523,6 @@ export function CloudinaryMedia() {
       }
 
       // 3. KONDISI GAMBAR CLOUDINARY
-      // Tetap menggunakan trik Blob agar gambar tidak membuka tab baru
       const response = await fetch(url);
       if (!response.ok) throw new Error("Gagal mengambil file dari server.");
       const blob = await response.blob();
@@ -539,7 +541,7 @@ export function CloudinaryMedia() {
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error("Download error:", error);
-      // Fallback cadangan: Jika fetch blob gambar gagal, buka di tab baru
+      // Fallback cadangan: Jika gagal, buka di tab baru
       window.open(url, "_blank");
     }
   };
