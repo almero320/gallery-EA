@@ -222,9 +222,11 @@ function usePinchZoom() {
   // Mouse Handlers (Untuk Geser Kiri, Kanan, Atas, Bawah via Mouse PC)
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      // Hanya aktif jika gambar sedang di-zoom dan tombol yang diklik adalah klik kiri (button 0)
+      // Hanya aktif jika gambar sedang di-zoom dan klik kiri (button 0)
       if (scale > 1.05 && e.button === 0) {
         e.preventDefault();
+        e.stopPropagation(); // Mencegah event bocor ke container/jendela aplikasi
+        
         stateRef.current.isDragging = true;
         stateRef.current.startX = e.clientX;
         stateRef.current.startY = e.clientY;
@@ -239,7 +241,8 @@ function usePinchZoom() {
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (stateRef.current.isDragging && scale > 1.05) {
         e.preventDefault();
-        // Menghitung seberapa jauh mouse digeser dari titik awal klik
+        e.stopPropagation(); // Pastikan gerakan mouse hanya fokus ke gambar saja
+
         const deltaX = e.clientX - stateRef.current.startX;
         const deltaY = e.clientY - stateRef.current.startY;
         
@@ -253,8 +256,11 @@ function usePinchZoom() {
     [scale, clampPosition],
   );
 
-  const handleMouseUp = useCallback(() => {
-    stateRef.current.isDragging = false;
+  const handleMouseUp = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (stateRef.current.isDragging) {
+      e.stopPropagation();
+      stateRef.current.isDragging = false;
+    }
   }, []);
 
   // Mouse Wheel Handler (Scroll Zoom)
@@ -674,6 +680,7 @@ export function CloudinaryMedia() {
             <div
               ref={lightboxZoom.containerRef}
               {...lightboxZoom.handlers}
+              onDragStart={(e) => e.preventDefault()}
               className="relative flex-1 w-full flex items-center justify-center overflow-hidden p-2 touch-none select-none"
               onClick={() => {
                 if (lightboxZoom.scale <= 1.1) setSelected(null);
