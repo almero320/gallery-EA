@@ -126,6 +126,7 @@ function LazyImage({
   );
 }
 
+// ─── CUSTOM HOOK PERBAIKAN: MENDUKUNG PINCH MOBILE & MOUSE WHEEL ZOOM PC ───
 function usePinchZoom() {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -148,6 +149,7 @@ function usePinchZoom() {
     return Math.sqrt(dx * dx + dy * dy);
   };
 
+  // Touch handlers (Mobile)
   const handleTouchStart = useCallback(
     (e: React.TouchEvent<HTMLDivElement>) => {
       if (e.touches.length === 2) {
@@ -208,6 +210,56 @@ function usePinchZoom() {
     }
   }, [scale]);
 
+  // Mouse handlers (PC Drag / Panning saat ter-zoom)
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (scale > 1.1 && e.button === 0) {
+        e.preventDefault();
+        stateRef.current.isDragging = true;
+        stateRef.current.startX = e.clientX;
+        stateRef.current.startY = e.clientY;
+        stateRef.current.startPanX = position.x;
+        stateRef.current.startPanY = position.y;
+      }
+    },
+    [scale, position],
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (stateRef.current.isDragging && scale > 1.1) {
+        e.preventDefault();
+        const deltaX = e.clientX - stateRef.current.startX;
+        const deltaY = e.clientY - stateRef.current.startY;
+        setPosition({
+          x: stateRef.current.startPanX + deltaX,
+          y: stateRef.current.startPanY + deltaY,
+        });
+      }
+    },
+    [scale],
+  );
+
+  const handleMouseUp = useCallback(() => {
+    stateRef.current.isDragging = false;
+  }, []);
+
+  // Mouse Wheel Handler (PC / Trackpad Scroll)
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    // Menghitung arah kemudi scroll wheel
+    const zoomIntensity = 0.1;
+    const delta = e.deltaY < 0 ? 1 : -1;
+    
+    setScale((prevScale) => {
+      const newScale = Math.min(Math.max(prevScale + delta * zoomIntensity, 1), 4);
+      if (newScale <= 1.1) {
+        setPosition({ x: 0, y: 0 });
+      }
+      return newScale;
+    });
+  }, []);
+
   const handleDoubleTap = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -234,7 +286,12 @@ function usePinchZoom() {
       onTouchStart: handleTouchStart,
       onTouchMove: handleTouchMove,
       onTouchEnd: handleTouchEnd,
-      onClick: handleDoubleTap,
+      onMouseDown: handleMouseDown,
+      onMouseMove: handleMouseMove,
+      onMouseUp: handleMouseUp,
+      onMouseLeave: handleMouseUp,
+      onWheel: handleWheel,
+      onDoubleClick: handleDoubleTap,
     },
     resetZoom,
   };
@@ -339,9 +396,8 @@ export function CloudinaryMedia() {
     return () => clearInterval(interval);
   }, [loadAllMedia]);
 
-  // ─── Delete Media Handler ────────────────────────────────────────
   const handleDelete = async (e: React.MouseEvent, item: MediaItem) => {
-    e.stopPropagation(); // Avoid triggering lightbox click events
+    e.stopPropagation();
 
     const confirmDelete = window.confirm(
       `Hapus memori "${item.title}" secara permanen?`,
@@ -355,7 +411,6 @@ export function CloudinaryMedia() {
           return;
         }
 
-        // Send backend DELETE request (Make sure your backend endpoint accepts item.id or publicId)
         const targetId = item.publicId || item.id;
         const response = await fetch(
           `${API_BASE_URL}/api/media/${encodeURIComponent(targetId)}`,
@@ -373,11 +428,9 @@ export function CloudinaryMedia() {
         }
       }
 
-      // Sync and purge from Client local storage list matching this item definition
       const rawStored = localStorage.getItem(STORAGE_KEY);
       if (rawStored) {
         const parsed = JSON.parse(rawStored);
-        // Sync filter check matching keys
         const updatedLocal = parsed.filter((localItem: any) => {
           if (item.source === "localStorage") return localItem.id !== item.id;
           return localItem.publicId !== item.publicId;
@@ -387,7 +440,6 @@ export function CloudinaryMedia() {
 
       alert("Item berhasil dihapus! 🗑️");
 
-      // Close the open lightbox if we just deleted the viewing item
       if (selected && selected.id === item.id) {
         setSelected(null);
       }
@@ -491,7 +543,7 @@ export function CloudinaryMedia() {
         </div>
       )}
 
-      {/* Primary Grid Layout Rendering loop */}
+      {/* Primary Grid Layout */}
       {!isLoading || mediaItems.length > 0 ? (
         <div
           className={
@@ -506,7 +558,6 @@ export function CloudinaryMedia() {
               onClick={() => setSelected(item)}
               className="group relative cursor-pointer bg-white border-4 border-[#FF00FF] hover:border-[#C44BFF] transition-all rounded-lg overflow-hidden hover:scale-[1.02]"
             >
-              {/* Quick Delete Overlay Button on main card list item view */}
               <button
                 onClick={(e) => handleDelete(e, item)}
                 className="absolute top-2 left-2 z-10 bg-red-600 text-white p-1.5 rounded-md hover:bg-red-700 active:scale-95 transition-all text-xs opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-md border border-white"
@@ -555,7 +606,6 @@ export function CloudinaryMedia() {
                     <p className="text-xs text-[#FF00FF]">by {item.uploader}</p>
                     <p className="text-xs text-gray-500">{item.date}</p>
                   </div>
-                  {/* Small trash bin button visible on mobile layout fields natively */}
                   <span
                     onClick={(e) => handleDelete(e, item)}
                     className="sm:hidden text-sm bg-gray-100 p-1 rounded border border-gray-300"
@@ -587,7 +637,6 @@ export function CloudinaryMedia() {
                     {Math.round(lightboxZoom.scale * 100)}%
                   </div>
                 )}
-                {/* Trash Button inside open lightbox view */}
                 <button
                   onClick={(e) => handleDelete(e, selected)}
                   className="bg-red-600 text-white px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1 hover:bg-red-700 active:scale-95 transition-transform border border-white/50"
@@ -610,7 +659,7 @@ export function CloudinaryMedia() {
             <div
               ref={lightboxZoom.containerRef}
               {...lightboxZoom.handlers}
-              className="relative flex-1 w-full flex items-center justify-center overflow-hidden p-2 touch-none"
+              className="relative flex-1 w-full flex items-center justify-center overflow-hidden p-2 touch-none select-none"
               onClick={() => {
                 if (lightboxZoom.scale <= 1.1) setSelected(null);
               }}
@@ -627,7 +676,9 @@ export function CloudinaryMedia() {
                 <motion.img
                   src={getUrl(selected)}
                   alt={selected.title}
-                  className="max-w-full max-h-[85vh] object-contain select-none cursor-grab active:cursor-grabbing"
+                  className={`max-w-full max-h-[85vh] object-contain select-none ${
+                    lightboxZoom.scale > 1.1 ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                  }`}
                   animate={{
                     scale: lightboxZoom.scale,
                     x: lightboxZoom.position.x,
@@ -655,8 +706,8 @@ export function CloudinaryMedia() {
               <p className="text-white/60 text-[11px] mt-1.5 leading-tight">
                 {isVideo(selected) ? "🎬 Video Player" : "📸 Image Viewer"} •{" "}
                 {lightboxZoom.scale > 1.1
-                  ? "Geser untuk memindahkan gambar"
-                  : "Ketuk dua kali / cubit untuk memperbesar"}
+                  ? "PC: Geser dengan klik-kiri mouse | Mobile: Geser dengan 1 jari"
+                  : "PC: Scroll mouse/trackpad untuk zoom, double-klik reset | Mobile: Cubit gambar"}
               </p>
             </div>
           </motion.div>
