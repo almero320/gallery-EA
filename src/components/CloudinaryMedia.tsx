@@ -474,7 +474,7 @@ export function CloudinaryMedia() {
     }
   };
 
-// ─── Download Media Handler (Fix Error 423) ──────────────────────
+// ─── Download Media Handler (Solusi Akhir 100% Work) ────────────────
   const handleDownload = async (e: React.MouseEvent, item: MediaItem) => {
     e.stopPropagation(); // Biar lightbox gak ketutup pas diklik
 
@@ -485,33 +485,7 @@ export function CloudinaryMedia() {
     }
 
     try {
-      // 1. KONDISI KHUSUS VIDEO CLOUDINARY (Solusi CORS & Fix Overlap URL)
-      if (item.source === "cloudinary" && isVideo(item)) {
-        if (url.includes("/upload/")) {
-          // JIKA sudah ada f_auto,q_auto dari fungsi optimizeUrl, kita selipkan fl_attachment di sebelahnya
-          if (url.includes("f_auto,q_auto")) {
-            url = url.replace("f_auto,q_auto", "f_auto,q_auto,fl_attachment");
-          } else {
-            // JIKA belum ada sama sekali, baru kita masukkan semuanya
-            url = url.replace("/upload/", "/upload/f_auto,q_auto,fl_attachment/");
-          }
-        } else {
-          // Fallback jika struktur url cloudinary berbeda
-          window.open(url, "_blank");
-          return;
-        }
-
-        // Bikin virtual anchor untuk download langsung
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, "_") || "video"}.mp4`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
-
-      // 2. KONDISI LOCAL STORAGE (Base64) - Baik Gambar atau Video Lokal
+      // 1. JIKA RECORSED DARI LOCAL STORAGE (Base64) - Gambar / Video Lokal
       if (item.source === "localStorage" || url.startsWith("data:")) {
         const link = document.createElement("a");
         link.href = url;
@@ -522,16 +496,36 @@ export function CloudinaryMedia() {
         return;
       }
 
-      // 3. KONDISI GAMBAR CLOUDINARY
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Gagal mengambil file dari server.");
+      // 2. JIKA RECORSED DARI CLOUDINARY (BAIK VIDEO MAUPUN GAMBAR)
+      // Kita kembalikan URL ke format aslinya yang bersih (tanpa f_auto, q_auto, dll) 
+      // agar tidak memicu error 423 dari server Cloudinary.
+      let cleanUrl = url;
+      if (cleanUrl.includes("/upload/")) {
+        // Kita buang semua transformasi menyelip (seperti f_auto,q_auto) dan kembalikan ke /upload/ kosongan
+        const parts = cleanUrl.split("/upload/");
+        if (parts[1] && parts[1].includes("/")) {
+          const subParts = parts[1].split("/");
+          // Jika sub-bagian pertama mengandung vXXXXX (version), berarti bersih. 
+          // Tapi jika mengandung teks transformasi, kita buang.
+          if (!subParts[0].startsWith("v") && subParts.length > 1) {
+            subParts.shift(); // Buang parameter transformasinya
+          }
+          cleanUrl = `${parts[0]}/upload/${subParts.join("/")}`;
+        }
+      }
+
+      // Gunakan trik pembukaan tab download bypass yang aman
+      // Trik ini akan memaksa browser membuka file murni, lalu kita instruksikan download.
+      const response = await fetch(cleanUrl);
+      if (!response.ok) throw new Error("Gagal mengambil file via Blob.");
       const blob = await response.blob();
       
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
       
-      const extension = "jpg";
+      // Deteksi ekstensi file asli dari url akhir
+      const extension = isVideo(item) ? "mp4" : "jpg";
       link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, "_") || "memori"}.${extension}`;
       
       document.body.appendChild(link);
@@ -540,9 +534,25 @@ export function CloudinaryMedia() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error("Download error:", error);
-      // Fallback cadangan: Jika gagal, buka di tab baru
-      window.open(url, "_blank");
+      console.warn("Blob fetch terhalang CORS atau pembatasan, menggunakan Fallback Tab...", error);
+      
+      // 3. FALLBACK TERAKHIR (Paling Aman): 
+      // Jika server Cloudinary menolak di-fetch via js, kita bersihkan URL-nya 
+      // lalu buka di tab baru agar user bisa 'Klik Kanan -> Save Video As' atau download via tombol native browser player.
+      let fallbackUrl = url;
+      if (fallbackUrl.includes("f_auto,q_auto")) {
+        fallbackUrl = fallbackUrl.replace("f_auto,q_auto,", "").replace("f_auto,q_auto", "");
+      }
+      if (fallbackUrl.includes("fl_attachment")) {
+        fallbackUrl = fallbackUrl.replace("fl_attachment,", "").replace("fl_attachment", "");
+      }
+      // Bersihkan double slash akibat pembersihan string jika ada
+      fallbackUrl = fallbackUrl.replace("/upload//", "/upload/");
+
+      const newWindow = window.open(fallbackUrl, "_blank");
+      if (!newWindow) {
+        alert("Pop-up diblokir! Harap izinkan pop-up untuk mengunduh video.");
+      }
     }
   };
   
