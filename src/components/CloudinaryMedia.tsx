@@ -474,6 +474,55 @@ export function CloudinaryMedia() {
     }
   };
 
+// ─── Download Media Handler ────────────────────────────────────────
+  const handleDownload = async (e: React.MouseEvent, item: MediaItem) => {
+    e.stopPropagation(); // Biar lightbox gak ketutup pas diklik
+
+    const url = getUrl(item);
+    if (!url) {
+      alert("Gagal mengunduh: URL media tidak ditemukan.");
+      return;
+    }
+
+    try {
+      // Jika dari localStorage (Base64), kita bisa langsung download pakai link biasa
+      if (item.source === "localStorage" || url.startsWith("data:")) {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, "_") || "download"}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      // Jika dari Cloudinary (URL External), kita butuh fetch dulu jadi Blob 
+      // untuk menghindari browser malah ngebuka gambar di tab baru bukannya nge-download
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Gagal mengambil file dari server.");
+      const blob = await response.blob();
+      
+      // Bikin object URL sementara dari blob tersebut
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      
+      // Tebak ekstensi file dari tipe data item atau url
+      const extension = isVideo(item) ? "mp4" : "jpg";
+      link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, "_") || "memori"}.${extension}`;
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Bersihkan memory setelah download selesai
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download error:", error);
+      alert("Gagal mengunduh media. Coba klik kanan pada gambar lalu pilih 'Save Image As'.");
+    }
+  };
+  
   const getUrl = (item: MediaItem): string => item.imageData || "";
 
   const isVideo = (item: MediaItem): boolean => {
@@ -651,30 +700,39 @@ export function CloudinaryMedia() {
             className="fixed inset-0 bg-black/95 flex flex-col justify-between z-[200] overflow-hidden"
           >
             {/* Top Bar Area */}
-            <div className="p-4 flex justify-between items-center z-30 w-full bg-gradient-to-b from-black/80 to-transparent">
-              <div className="flex gap-2 items-center">
-                {lightboxZoom.scale > 1.1 && (
-                  <div className="bg-black/60 text-white px-3 py-1 rounded-full text-xs font-mono">
-                    {Math.round(lightboxZoom.scale * 100)}%
-                  </div>
-                )}
-                <button
-                  onClick={(e) => handleDelete(e, selected)}
-                  className="bg-red-600 text-white px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1 hover:bg-red-700 active:scale-95 transition-transform border border-white/50"
-                >
-                  🗑️ Hapus
-                </button>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelected(null);
-                }}
-                className="w-12 h-12 bg-[#FF00FF] text-white rounded-full flex items-center justify-center text-xl font-bold border-2 border-white shadow-md active:scale-90 transition-transform"
-              >
-                ✕
-              </button>
-            </div>
+<div className="p-4 flex justify-between items-center z-30 w-full bg-gradient-to-b from-black/80 to-transparent">
+  <div className="flex gap-2 items-center">
+    {lightboxZoom.scale > 1.1 && (
+      <div className="bg-black/60 text-white px-3 py-1 rounded-full text-xs font-mono">
+        {Math.round(lightboxZoom.scale * 100)}%
+      </div>
+    )}
+    
+    {/* 👇 TOMBOL DOWNLOAD BARU */}
+    <button
+      onClick={(e) => handleDownload(e, selected)}
+      className="bg-green-600 text-white px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1 hover:bg-green-700 active:scale-95 transition-transform border border-white/50"
+    >
+      📥 Download
+    </button>
+
+    <button
+      onClick={(e) => handleDelete(e, selected)}
+      className="bg-red-600 text-white px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1 hover:bg-red-700 active:scale-95 transition-transform border border-white/50"
+    >
+      🗑️ Hapus
+    </button>
+  </div>
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      setSelected(null);
+    }}
+    className="w-12 h-12 bg-[#FF00FF] text-white rounded-full flex items-center justify-center text-xl font-bold border-2 border-white shadow-md active:scale-90 transition-transform"
+  >
+    ✕
+  </button>
+</div>
 
             {/* Central Media Viewer Frame */}
             <div
