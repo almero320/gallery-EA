@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+@import "tailwindcss";
+@import "nes.css/css/nes.css";
+
+@theme {
+  --color-retro-purple: #4B0082;
+  --color-neon-pink: #FF00FF;
+  --color-soft-purple: #8A2BE2;
+    --color-pcb-dark: #002200;
+  --color-pcb-light: #32CD32;
+  --color-pcb-trace: #DAA520;
+  --color-pcb-trace-glow: #E0FFE0;
+  --color-pcb-pad: #228B22;
+  --color-pcb-blocked: #0a0a0a;
+  --color-pcb-circuit: #004400;
+  --animate-flicker: flicker 0.15s ease-in-out infinite alternate;
+}
+
+/* ─── Keyframes for Flicker Animation ──────────────────────────────── */
+@keyframes flicker {
+  0% {
+    opacity: 0.3;
+    filter: brightness(0.4);
+  }
+  25% {
+    opacity: 0.8;
+    filter: brightness(1.2);
+  }
+  50% {
+    opacity: 0.2;
+    filter: brightness(0.3);
+  }
+  75% {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+  100% {
+    opacity: 0.5;
+    filter: brightness(0.8);
+  }
+}
+
+/* Dreamy Pixel Sky Background */
+.crt {
+  position: relative;
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #FF9AED, #C44BFF, #6B00B8, #3B0080, #1A0033);
+  overflow: hidden;
+  font-family: 'Press Start 2P', system-ui;
+}
+
+.crt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 50%, rgba(255,255,255,0.1) 50%);
+  background-size: 100% 6px;
+  animation: scanlines 2.8s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes scanlines {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100%; }
+}
+
+/* Window Styling */
+.window {
+  background: rgba(255, 255, 255, 0.97) !important;
+  border: 6px solid #FF00FF !important;
+  box-shadow: 0 0 0 8px #6B00B8, 10px 10px 0 #000;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.title-bar {
+  background: linear-gradient(to right, #C44BFF, #FF00FF) !important;
+  color: white;
+  padding: 10px 16px;
+  font-size: 15px;
+  text-shadow: 2px 2px 0 #000;
+  cursor: move;
+  user-select: none;
+}
+
+.title-bar-buttons button {
+  width: 28px;
+  height: 26px;
+  margin-left: 6px;
+  font-size: 18px;
+  line-height: 22px;
+  background: #fff;
+  color: #000;
+  border: 2px solid #000;
+}
+
+.title-bar-buttons button:hover {
+  background: #FF00FF;
+  color: white;
+}
+
+/* Desktop Icons */
+.desktop-icon {
+  position: absolute;
+  width: 80px;
+  text-align: center;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s;
+  z-index: 20;
+}
+
+.desktop-icon:hover {
+  transform: scale(1.1);
+}
+
+.desktop-icon img {
+  width: 48px;
+  height: 48px;
+  image-rendering: pixelated;
+  margin-bottom: 4px;
+}
+
+.desktop-icon span {
+  display: block;
+  font-size: 11px;
+  padding: 2px 4px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 2px;
+}
+
+/* ─── NES.css Progress Bar Override for PCB Timer ────────────────── */
+.nes-progress.is-primary {
+  --progress-bar-color: #FF00FF;
+  --progress-background-color: #1a1a1a;
+  border: 2px solid #FF00FF;
+}
+
+.nes-progress.is-primary::-webkit-progress-value {
+  background-color: #FF00FF;
+  transition: width 0.3s ease;
+}
+
+.nes-progress.is-primary::-moz-progress-bar {
+  background-color: #FF00FF;
+  transition: width 0.3s ease;
+}
+
+/* ─── PCB-Fixer Specific Styles ───────────────────────────────────── */
+.pcb-grid-cell {
+  position: relative;
+  overflow: hidden;
+}
+
+.pcb-grid-cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, transparent 48%, var(--color-pcb-circuit) 49%, var(--color-pcb-circuit) 51%, transparent 52%),
+    linear-gradient(0deg, transparent 48%, var(--color-pcb-circuit) 49%, var(--color-pcb-circuit) 51%, transparent 52%);
+  background-size: 100% 100%, 100% 100%;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* Power On Glow Effect */
+.pcb-power-on .pcb-grid-cell.trace {
+  background-color: var(--color-pcb-trace-glow);
+  box-shadow: 0 0 15px #fff, 0 0 25px #00ffff, inset 0 0 10px rgba(255,255,255,0.5);
+  border-color: #fff;
+  animation: tracePulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes tracePulse {
+  from {
+    box-shadow: 0 0 10px #fff, 0 0 15px #00ffff;
+  }
+  to {
+    box-shadow: 0 0 20px #fff, 0 0 40px #00ffff, 0 0 60px rgba(0,255,255,0.3);
+  }
+}
+
+/* Flicker phase for power-on transition */
+.pcb-flicker {
+  animation: flicker 0.12s steps(2) 8;
+}
+
+/* ─── Locked Cell Style ───────────────────────────────────────────── */
+.pcb-locked {
+  background-color: #330000 !important;
+  border: 2px dashed #FF0040 !important;
+  opacity: 0.8;
+}
+
+.pcb-locked::after {
+  content: '🔒';
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Timer Pulse when critical ──────────────────────────────────── */
+@keyframes timerPulse {
+  0%, 100% { box-shadow: 0 0 5px #FF0040; }
+  50% { box-shadow: 0 0 20px #FF0040, 0 0 40px #FF0040; }
+}
+
+.timer-critical {
+  animation: timerPulse 0.5s ease-in-out infinite;
+}
+
+/* Shutdown Screen */
+.shutdown-screen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #FF00FF;
+  font-size: 24px;
+  animation: shutdown 2.5s forwards;
+}
+
+@keyframes shutdown {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
