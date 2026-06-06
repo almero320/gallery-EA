@@ -474,18 +474,41 @@ export function CloudinaryMedia() {
     }
   };
 
-// ─── Download Media Handler ────────────────────────────────────────
+// ─── Download Media Handler (Perbaikan Video) ──────────────────────
   const handleDownload = async (e: React.MouseEvent, item: MediaItem) => {
     e.stopPropagation(); // Biar lightbox gak ketutup pas diklik
 
-    const url = getUrl(item);
+    let url = getUrl(item);
     if (!url) {
       alert("Gagal mengunduh: URL media tidak ditemukan.");
       return;
     }
 
     try {
-      // Jika dari localStorage (Base64), kita bisa langsung download pakai link biasa
+      // 1. KONDISI KHUSUS VIDEO CLOUDINARY (Solusi CORS)
+      // Kita sisipkan fl_attachment ke URL Cloudinary agar server memaksa browser mendownload langsung
+      if (item.source === "cloudinary" && isVideo(item)) {
+        if (url.includes("/upload/")) {
+          // Menyisipkan f_auto,q_auto (jika belum ada) ditambah fl_attachment
+          url = url.replace("/upload/", "/upload/f_auto,q_auto,fl_attachment/");
+        } else {
+          // Jika strukturnya berbeda, kita coba langsung buka tab baru yang memaksa download
+          window.open(url, "_blank");
+          return;
+        }
+
+        // Bikin virtual anchor untuk mendownload URL Cloudinary yang sudah dimodifikasi
+        const link = document.createElement("a");
+        link.href = url;
+        // Beri nama file (beberapa browser modern akan mematuhi ini jika header pas)
+        link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, "_") || "video"}.mp4`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+
+      // 2. KONDISI LOCAL STORAGE (Base64) - Baik Gambar atau Video Lokal
       if (item.source === "localStorage" || url.startsWith("data:")) {
         const link = document.createElement("a");
         link.href = url;
@@ -496,30 +519,28 @@ export function CloudinaryMedia() {
         return;
       }
 
-      // Jika dari Cloudinary (URL External), kita butuh fetch dulu jadi Blob 
-      // untuk menghindari browser malah ngebuka gambar di tab baru bukannya nge-download
+      // 3. KONDISI GAMBAR CLOUDINARY
+      // Tetap menggunakan trik Blob agar gambar tidak membuka tab baru
       const response = await fetch(url);
       if (!response.ok) throw new Error("Gagal mengambil file dari server.");
       const blob = await response.blob();
       
-      // Bikin object URL sementara dari blob tersebut
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
       
-      // Tebak ekstensi file dari tipe data item atau url
-      const extension = isVideo(item) ? "mp4" : "jpg";
+      const extension = "jpg";
       link.download = `${item.title.replace(/[^a-zA-Z0-9]/g, "_") || "memori"}.${extension}`;
       
       document.body.appendChild(link);
       link.click();
       
-      // Bersihkan memory setelah download selesai
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error("Download error:", error);
-      alert("Gagal mengunduh media. Coba klik kanan pada gambar lalu pilih 'Save Image As'.");
+      // Fallback cadangan: Jika fetch blob gambar gagal, buka di tab baru
+      window.open(url, "_blank");
     }
   };
   
