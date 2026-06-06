@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://192.168.1.13:3001";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const STORAGE_KEY = "fotokenanganXIEA";
 
 type MediaItem = {
