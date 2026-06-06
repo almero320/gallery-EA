@@ -273,4 +273,8 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.use("/api/*", (req, res) => {
+  res.status(404).json({ success: false, error: "API Route Not Found" });
+});
+
 export default app;
